@@ -1,11 +1,6 @@
 import { Request, Response } from "express";
 import { SetSMTPConfig, SendEmail } from "../email.controller";
-import {
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-} from "firebase/firestore";
+import { addDoc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import nodemailer from "nodemailer";
 import { FirebaseError } from "firebase/app";
 
