@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: Run Tests
+    name: Run Tests and Build
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -24,13 +24,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          cache: yarn
 
       - name: Install dependencies
-        run: npm install
-      
+        run: yarn install --frozen-lockfile
+
       - name: Compile TypeScript
-        run: npx tsc
+        run: yarn tsc
 
       - name: Run tests
-        run: npm test
+        run: yarn test
