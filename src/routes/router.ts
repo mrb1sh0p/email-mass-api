@@ -1,7 +1,7 @@
 import express from "express";
 import { authenticate } from "../controllers/auth";
 import { verifyJWT } from "../middleware/verify";
-import { CreateModel } from "../controllers/modelBody";
+import { CreateModel } from "../controllers/ModelController";
 
 const router = express.Router();
 
