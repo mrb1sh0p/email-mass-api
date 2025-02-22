@@ -1,7 +1,7 @@
 {
   "name": "email-mass-api",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "index.ts",
   "repository": "https://github.com/mrb1sh0p/email-mass-api.git",
   "author": "João Gustavo Soares Bispo <jgbispo20@gmail.com>",
   "license": "MIT",
