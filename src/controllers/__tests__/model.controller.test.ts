@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { CreateModel, UpdateModel, DeleteModel } from "../model.controller";
 import { addDoc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { CreateModel, UpdateModel, DeleteModel } from "../model.controller";
 import { FirebaseError } from "firebase/app";
 
 jest.mock("../../firebase", () => ({
