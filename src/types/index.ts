@@ -1,3 +1,4 @@
-export interface IUser {
-  uid: string;
+export interface IModelBody{
+  title: string,
+  body: string,
 }

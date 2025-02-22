@@ -3,12 +3,16 @@ import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firabase";
-import { IUser } from "../types";
 dotenv.config();
+
+interface AuthProps {
+  email: string;
+  password: string;
+}
 
 export const authenticate = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password }: AuthProps = req.body;
 
     await signInWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
@@ -16,8 +20,8 @@ export const authenticate = async (req: Request, res: Response) => {
 
         if (!secretKey) throw new Error("Secret Key is not defined");
 
-        const token = jwt.sign({ userId: userCredential.user.uid }, secretKey, {
-          expiresIn: 300,
+        const token = jwt.sign({ uid: userCredential.user.uid }, secretKey, {
+          expiresIn: "24h",
         });
 
         return res.status(201).send({

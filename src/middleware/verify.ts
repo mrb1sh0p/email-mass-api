@@ -2,20 +2,11 @@ import dotenv from "dotenv";
 dotenv.config();
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { IUser } from "../types";
-
-// Estender a interface Request do Express
-declare module "express" {
-  interface Request {
-    user?: IUser;
-  }
-}
 
 export const verifyJWT = (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     
-    // Verificar formato do header
     if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({ 
         success: false,
@@ -38,7 +29,7 @@ export const verifyJWT = (req: Request, res: Response, next: NextFunction) => {
         });
       }
       
-      req.user = decoded as IUser;
+      req.user = decoded;
       next();
     });
 
