@@ -16,6 +16,11 @@ import {
 import { FirebaseError } from "firebase/app";
 import { SMTPConfig } from "../types/emails.types";
 
+interface Attachment {
+  filename: string;
+  content: string;
+}
+
 interface SendEmailRequest {
   modelId: string;
   smtpId: string;
@@ -27,6 +32,26 @@ interface SendEmailRequest {
     }[];
   }[];
 }
+
+const MAX_PDF_SIZE = 30 * 1024 * 1024;
+
+const validatePDF = (attachment: Attachment) => {
+  const contentBuffer = Buffer.from(attachment.content, "base64");
+  if (contentBuffer.length > MAX_PDF_SIZE) {
+    throw new Error(`PDF ${attachment.filename} excede 5MB`);
+  }
+
+  const pdfHeader = contentBuffer.subarray(0, 4).toString();
+  if (pdfHeader !== "%PDF") {
+    throw new Error(`Arquivo ${attachment.filename} não é um PDF válido`);
+  }
+
+  return {
+    filename: attachment.filename.replace(/[^a-zA-Z0-9_.-]/g, "_") + ".pdf",
+    content: contentBuffer,
+    contentType: "application/pdf",
+  };
+};
 
 export const SetSMTPConfig = async (req: Request, res: Response) => {
   try {
@@ -137,90 +162,133 @@ export const SendEmail = async (req: Request, res: Response) => {
   try {
     const { modelId, recipients, smtpId }: SendEmailRequest = req.body;
 
-    if (!modelId || !recipients?.length) {
+    if (!modelId || !recipients?.length || !smtpId) {
       return res.status(400).json({
         success: false,
-        error: "modelId e recipients são obrigatórios",
+        error: "modelId, smtpId e recipients são obrigatórios",
+        errorCode: "MISSING_REQUIRED_FIELDS",
       });
     }
 
-    const smtpConfigRef = doc(db, "smtpConfigs", smtpId);
-    const smtpConfig = await getDoc(smtpConfigRef);
+    const [smtpConfig, modelDoc] = await Promise.all([
+      getDoc(doc(db, "smtpConfigs", smtpId)),
+      getDoc(doc(db, "models", modelId)),
+    ]);
 
     if (!smtpConfig.exists()) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
         error: "Configuração SMTP não encontrada",
+        errorCode: "SMTP_NOT_FOUND",
       });
     }
-
-    const modelRef = doc(db, "models", modelId);
-    const modelDoc = await getDoc(modelRef);
 
     if (!modelDoc.exists()) {
       return res.status(404).json({
         success: false,
         error: "Template de e-mail não encontrado",
+        errorCode: "TEMPLATE_NOT_FOUND",
       });
     }
 
+    // 3. Configuração segura do transporte
+    const smtpData = smtpConfig.data();
     const transporter = nodemailer.createTransport({
-      host: smtpConfig.data().serverAddress,
-      port: smtpConfig.data().port,
-      requireTLS: smtpConfig.data().sslMethod == "TLS" ? true : false,
-      auth: {
-        user: smtpConfig.data().authAccount,
-        pass: smtpConfig.data().authPassword,
-      },
+      host: smtpData.serverAddress,
+      port: smtpData.port,
+      secure: smtpData.sslMethod === "SSL",
+      requireTLS: smtpData.sslMethod === "TLS",
+      auth:
+        smtpData.authMethod === "SMTP-AUTH"
+          ? {
+              user: smtpData.authAccount,
+              pass: smtpData.authPassword,
+            }
+          : undefined,
     });
-
-    const results = [];
 
     try {
       await transporter.verify();
-      console.log("Conexão SMTP válida!");
     } catch (error) {
-      console.log(smtpConfig.data());
-      console.error("Falha na conexão:", error);
+      console.error("Falha na conexão SMTP:", error);
+      return res.status(502).json({
+        success: false,
+        error: "Falha na conexão com o servidor SMTP",
+        errorCode: "SMTP_CONNECTION_FAILED",
+      });
     }
 
-    for (const recipient of recipients) {
-      try {
-        const mailOptions = {
-          from: smtpConfig.data().emailAddress,
-          to: recipient.email,
-          subject: modelDoc.data().title,
-          html: modelDoc.data().body,
-          attachments:
-            recipient.attachments?.map((att) => ({
-              filename: att.filename,
-              content: Buffer.from(att.content, "base64"),
-            })) || [],
-        };
+    const BATCH_SIZE = 5;
+    const results = [];
 
-        await transporter.sendMail(mailOptions);
+    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+      const batch = recipients.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (recipient) => {
+          try {
+            const mailOptions = {
+              from: smtpData.emailAddress,
+              to: recipient.email,
+              subject: modelDoc.data().title,
+              html: modelDoc.data().body,
+              attachments:
+                recipient.attachments?.map((att) => ({
+                  filename: `${att.filename.replace(
+                    /[^a-zA-Z0-9_-]/g,
+                    ""
+                  )}.pdf`,
+                  content: Buffer.from(att.content, "base64"),
+                  contentType: "application/pdf",
+                })) || [],
+            };
 
-        results.push({
-          email: recipient.email,
-          success: true,
-          attachmentsSent: recipient.attachments?.length || 0,
-        });
-      } catch (error) {
-        results.push({
-          email: recipient.email,
-          success: false,
-          error: error instanceof Error ? error.message : "Erro desconhecido",
-        });
-      }
+            await transporter.sendMail(mailOptions);
+
+            return {
+              email: recipient.email,
+              success: true,
+              attachmentsSent: mailOptions.attachments.length,
+            };
+          } catch (error) {
+            return {
+              email: recipient.email,
+              success: false,
+              error:
+                error instanceof Error ? error.message : "Erro desconhecido",
+              errorCode: "EMAIL_SEND_FAILED",
+            };
+          }
+        })
+      );
+
+      results.push(...batchResults);
     }
 
-    //TODO: Save log in firebase
+    const logRef = await addDoc(collection(db, "emailLogs"), {
+      modelId,
+      smtpId,
+      timestamp: serverTimestamp(),
+      totalRecipients: recipients.length,
+      successCount: results.filter((r) => r.success).length,
+      errorCount: results.filter((r) => !r.success).length,
+      details: results,
+    });
 
     res.json({
       success: true,
-      sent: results.filter((r) => r.success).length,
-      failed: results.filter((r) => !r.success).length,
+      logId: logRef.id,
+      stats: {
+        sent: results.filter((r) => r.success).length,
+        failed: results.filter((r) => !r.success).length,
+      },
       details: results,
     });
-  } catch (error) {}
+  } catch (error) {
+    console.error("Erro geral no SendEmail:", error);
+    res.status(500).json({
+      success: false,
+      error: "Erro interno no servidor",
+      errorCode: "INTERNAL_SERVER_ERROR",
+    });
+  }
 };
