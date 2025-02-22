@@ -8,12 +8,10 @@ const router = express.Router();
 
 router.post("/auth", authenticate);
 
-// rotas dos modelos
 router.post("/model", verifyJWT, CreateModel);
 router.put("/model", verifyJWT, UpdateModel);
 router.delete("/model", verifyJWT, DeleteModel);
 
-// rotas para envio
 router.post("/smtp", verifyJWT, SetSMTPConfig);
 router.post("/send", verifyJWT, SendEmail);
 
