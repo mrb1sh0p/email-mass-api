@@ -5,9 +5,6 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": ".",
-    "paths": {
-      "@controllers/*": ["src/controllers/*"]
-    },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
