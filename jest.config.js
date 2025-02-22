@@ -33,14 +33,6 @@ module.exports = {
     "^@/(.*)$": "<rootDir>/src/$1", // Exemplo de alias @/ para src/
   },
 
-  // Configurações globais do ts-jest
-  globals: {
-    "ts-jest": {
-      tsconfig: "tsconfig.json", // Usa o tsconfig do projeto
-      isolatedModules: true, // Melhora performance em projetos grandes
-    },
-  },
-
   // Limite de tempo para cada teste (em milissegundos)
   testTimeout: 10000, // 10 segundos
 
