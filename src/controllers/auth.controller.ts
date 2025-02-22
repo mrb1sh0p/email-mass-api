@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firabase";
+import { auth } from "../firebase";
 dotenv.config();
 
 interface AuthProps {

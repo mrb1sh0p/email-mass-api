@@ -9,7 +9,7 @@ import {
   deleteDoc,
   getDoc,
 } from "firebase/firestore";
-import { db } from "../firabase";
+import { db } from "../firebase";
 import { FirebaseError } from "firebase/app";
 
 export const CreateModel = async (req: Request, res: Response) => {
@@ -121,7 +121,7 @@ export const UpdateModel = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteModel = async (modelId: string) => {
+export const DeleteModel = async (modelId: string) => {
   try {
     if (!modelId || typeof modelId !== "string" || modelId.trim() === "") {
       return {
