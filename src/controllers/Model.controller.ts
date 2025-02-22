@@ -15,7 +15,6 @@ import { FirebaseError } from "firebase/app";
 export const CreateModel = async (req: Request, res: Response) => {
   try {
     const { title, body }: IModelBody = req.body;
-
     if (!title || !body) {
       return res.status(400).json({
         success: false,
@@ -25,26 +24,29 @@ export const CreateModel = async (req: Request, res: Response) => {
     }
 
     const modelsRef = collection(db, "models");
+    const trimmedTitle = title.trim();
+    const trimmedBody = body.trim();
 
     const docRef = await addDoc(modelsRef, {
-      title: title.trim(),
-      body: body.trim(),
+      title: trimmedTitle,
+      body: trimmedBody,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
 
-    const newDoc = await getDoc(docRef);
+    const newDocSnap = await getDoc(docRef);
+    const newDocData = newDocSnap.data();
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Modelo criado com sucesso",
       data: {
         id: docRef.id,
-        ...newDoc.data(),
+        ...newDocData,
       },
     });
   } catch (error) {
-    console.error("Erro na criação:", error);
+    console.error("Erro na criação do modelo:", error);
 
     if (error instanceof FirebaseError) {
       return res.status(503).json({
@@ -56,8 +58,7 @@ export const CreateModel = async (req: Request, res: Response) => {
 
     const errorMessage =
       error instanceof Error ? error.message : "Erro desconhecido";
-
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: "Falha na criação do modelo",
       details: errorMessage,
@@ -67,7 +68,8 @@ export const CreateModel = async (req: Request, res: Response) => {
 
 export const UpdateModel = async (req: Request, res: Response) => {
   try {
-    const { modelId, ...updateFields }: Partial<IModelBody> = req.body;
+    const { modelId, title, body }: Partial<IModelBody> & { modelId?: string } =
+      req.body;
 
     if (!modelId) {
       return res.status(400).json({
@@ -76,17 +78,13 @@ export const UpdateModel = async (req: Request, res: Response) => {
       });
     }
 
-    const modelDocRef = doc(db, "models", modelId);
-
-    const updateData: { [key: string]: any } = {
-      updatedAt: serverTimestamp(),
-    };
-
-    Object.entries(updateFields).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateData[key] = value;
-      }
-    });
+    const updateData: { [key: string]: any } = { updatedAt: serverTimestamp() };
+    if (title !== undefined) {
+      updateData.title = title.trim();
+    }
+    if (body !== undefined) {
+      updateData.body = body.trim();
+    }
 
     if (Object.keys(updateData).length === 1) {
       return res.status(400).json({
@@ -95,17 +93,18 @@ export const UpdateModel = async (req: Request, res: Response) => {
       });
     }
 
+    const modelDocRef = doc(db, "models", modelId);
     await updateDoc(modelDocRef, updateData);
+    const updatedDocSnap = await getDoc(modelDocRef);
+    const updatedData = updatedDocSnap.data();
 
-    const updatedDoc = (await getDoc(modelDocRef)).data();
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Modelo atualizado com sucesso",
-      data: updatedDoc,
+      data: updatedData,
     });
   } catch (error) {
-    console.error("Erro na atualização:", error);
+    console.error("Erro na atualização do modelo:", error);
 
     if (error instanceof FirebaseError) {
       return res.status(500).json({
@@ -114,7 +113,7 @@ export const UpdateModel = async (req: Request, res: Response) => {
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: "Erro interno no servidor",
     });
@@ -131,9 +130,8 @@ export const DeleteModel = async (modelId: string) => {
       };
     }
 
-    const noteRef = doc(db, "models", modelId);
-
-    const docSnapshot = await getDoc(noteRef);
+    const modelRef = doc(db, "models", modelId);
+    const docSnapshot = await getDoc(modelRef);
     if (!docSnapshot.exists()) {
       return {
         success: false,
@@ -142,11 +140,10 @@ export const DeleteModel = async (modelId: string) => {
       };
     }
 
-    await updateDoc(noteRef, {
+    await updateDoc(modelRef, {
       deletedAt: serverTimestamp(),
     });
-
-    await deleteDoc(noteRef);
+    await deleteDoc(modelRef);
 
     return {
       success: true,

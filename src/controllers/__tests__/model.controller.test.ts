@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { addDoc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { CreateModel, UpdateModel, DeleteModel } from "../model.controller";
+import { addDoc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 
 jest.mock("../../firebase", () => ({
@@ -22,9 +22,7 @@ afterAll(() => {
 });
 
 const mockRequest = (body: any = {}) =>
-  ({
-    body,
-  } as Request);
+  ({ body } as Request);
 
 const mockResponse = () => {
   const res = {} as Response;
@@ -50,14 +48,17 @@ describe("CreateModel", () => {
 
   it("deve criar um modelo com sucesso", async () => {
     const modelData = {
-      title: "Test Model",
-      body: "Test Body",
+      title: " Test Model ",
+      body: " Test Body ",
     };
 
     (addDoc as jest.Mock).mockResolvedValue({ id: "123" });
     (getDoc as jest.Mock).mockResolvedValue({
       exists: () => true,
-      data: () => modelData,
+      data: () => ({
+        title: modelData.title.trim(),
+        body: modelData.body.trim(),
+      }),
     });
 
     const req = mockRequest(modelData);
@@ -65,13 +66,15 @@ describe("CreateModel", () => {
 
     await CreateModel(req, res);
 
+    expect(addDoc).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       message: "Modelo criado com sucesso",
       data: {
         id: "123",
-        ...modelData,
+        title: modelData.title.trim(),
+        body: modelData.body.trim(),
       },
     });
   });
@@ -147,13 +150,15 @@ describe("UpdateModel", () => {
   it("deve atualizar um modelo com sucesso", async () => {
     const updateData = {
       modelId: "123",
-      title: "Updated Title",
+      title: " Updated Title ",
     };
 
     (updateDoc as jest.Mock).mockResolvedValue({});
     (getDoc as jest.Mock).mockResolvedValue({
       exists: () => true,
-      data: () => updateData,
+      data: () => ({
+        title: updateData.title.trim(),
+      }),
     });
 
     const req = mockRequest(updateData);
@@ -161,11 +166,12 @@ describe("UpdateModel", () => {
 
     await UpdateModel(req, res);
 
+    expect(updateDoc).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       message: "Modelo atualizado com sucesso",
-      data: updateData,
+      data: { title: updateData.title.trim() },
     });
   });
 
@@ -193,7 +199,6 @@ describe("UpdateModel", () => {
 describe("DeleteModel", () => {
   it("deve retornar erro se o ID for inválido", async () => {
     const result = await DeleteModel("");
-
     expect(result).toEqual({
       success: false,
       error: "ID do modelo inválido",
@@ -203,9 +208,7 @@ describe("DeleteModel", () => {
 
   it("deve retornar erro se o modelo não for encontrado", async () => {
     (getDoc as jest.Mock).mockResolvedValue({ exists: () => false });
-
     const result = await DeleteModel("123");
-
     expect(result).toEqual({
       success: false,
       error: "Modelo não encontrado",
@@ -219,7 +222,6 @@ describe("DeleteModel", () => {
     (deleteDoc as jest.Mock).mockResolvedValue({});
 
     const result = await DeleteModel("123");
-
     expect(result).toEqual({
       success: true,
       message: "Modelo excluído com sucesso",
@@ -232,9 +234,7 @@ describe("DeleteModel", () => {
     (getDoc as jest.Mock).mockRejectedValue(
       new FirebaseError("firestore/error", "Firestore error")
     );
-
     const result = await DeleteModel("123");
-
     expect(result).toEqual({
       success: false,
       error: "Erro no Firestore: Firestore error",
