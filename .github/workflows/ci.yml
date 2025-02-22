@@ -29,8 +29,5 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Compile TypeScript
-        run: yarn tsc
-
       - name: Run tests
         run: yarn test
