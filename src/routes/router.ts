@@ -1,7 +1,7 @@
 import express from "express";
 import { authenticate } from "../controllers/auth.controller";
 import { verifyJWT } from "../middleware/verify";
-import { CreateModel, DeleteModel, UpdateModel } from "../controllers/Model.controller";
+import { CreateModel, DeleteModel, UpdateModel } from "../controllers/model.controller"
 import { SendEmail, SetSMTPConfig } from "../controllers/email.controller";
 
 const router = express.Router();
