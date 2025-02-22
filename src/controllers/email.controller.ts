@@ -1,4 +1,3 @@
-// src/controllers/email.controller.ts
 import { Request, Response } from "express";
 import nodemailer from "nodemailer";
 import { db } from "../firebase";
@@ -18,7 +17,8 @@ import { SMTPConfig } from "../types/emails.types";
 
 interface Attachment {
   filename: string;
-  content: string;
+  content: Buffer;
+  contentType: string;
 }
 
 interface SendEmailRequest {
@@ -26,19 +26,16 @@ interface SendEmailRequest {
   smtpId: string;
   recipients: {
     email: string;
-    attachments?: {
-      filename: string;
-      content: string;
-    }[];
+    attachments?: Attachment[];
   }[];
 }
 
 const MAX_PDF_SIZE = 30 * 1024 * 1024;
 
 const validatePDF = (attachment: Attachment) => {
-  const contentBuffer = Buffer.from(attachment.content, "base64");
+  const contentBuffer = Buffer.from(attachment.content.toString(), "base64");
   if (contentBuffer.length > MAX_PDF_SIZE) {
-    throw new Error(`PDF ${attachment.filename} excede 5MB`);
+    throw new Error(`PDF ${attachment.filename} excede 30MB`);
   }
 
   const pdfHeader = contentBuffer.subarray(0, 4).toString();
@@ -66,10 +63,7 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
       "emailAddress",
     ];
 
-    const missingFields = requiredFields.filter(
-      (field) => !smtpConfig[field as keyof SMTPConfig]
-    );
-
+    const missingFields = requiredFields.filter((field) => !smtpConfig[field]);
     if (missingFields.length > 0) {
       return res.status(400).json({
         success: false,
@@ -90,11 +84,7 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
       });
     }
 
-    // if (smtpConfig.authPassword) {
-    //   const encryptedPassword = await encrypt(smtpConfig.authPassword);
-    //   smtpConfig.authPassword = encryptedPassword;
-    // }
-
+    // Possível implementação de criptografia para authPassword pode ser adicionada aqui.
     const smtpConfigsRef = collection(db, "smtpConfigs");
     const querySnapshot = await getDocs(
       query(smtpConfigsRef, where("userId", "==", userId))
@@ -123,13 +113,10 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
       delete configData.authPassword;
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Configuração SMTP salva com sucesso",
-      data: {
-        id: docRef.id,
-        ...configData,
-      },
+      data: { id: docRef.id, ...configData },
     });
   } catch (error) {
     console.error("Erro na configuração SMTP:", error);
@@ -142,15 +129,7 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
       });
     }
 
-    if (error instanceof Error && error.message.includes("encrypt")) {
-      return res.status(500).json({
-        success: false,
-        error: "Erro na criptografia de dados sensíveis",
-        errorCode: "ENCRYPTION_ERROR",
-      });
-    }
-
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: "Erro interno no servidor",
       errorCode: "INTERNAL_ERROR",
@@ -161,7 +140,6 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
 export const SendEmail = async (req: Request, res: Response) => {
   try {
     const { modelId, recipients, smtpId }: SendEmailRequest = req.body;
-
     if (!modelId || !recipients?.length || !smtpId) {
       return res.status(400).json({
         success: false,
@@ -170,12 +148,30 @@ export const SendEmail = async (req: Request, res: Response) => {
       });
     }
 
-    const [smtpConfig, modelDoc] = await Promise.all([
+    // Validação prévia dos anexos para todos os destinatários
+    for (const recipient of recipients) {
+      if (recipient.attachments) {
+        try {
+          recipient.attachments = recipient.attachments.map(validatePDF);
+        } catch (validationError) {
+          return res.status(400).json({
+            success: false,
+            error:
+              validationError instanceof Error
+                ? validationError.message
+                : "Erro de validação de anexo",
+            errorCode: "INVALID_ATTACHMENT",
+          });
+        }
+      }
+    }
+
+    const [smtpConfigSnap, modelDocSnap] = await Promise.all([
       getDoc(doc(db, "smtpConfigs", smtpId)),
       getDoc(doc(db, "models", modelId)),
     ]);
 
-    if (!smtpConfig.exists()) {
+    if (!smtpConfigSnap.exists()) {
       return res.status(404).json({
         success: false,
         error: "Configuração SMTP não encontrada",
@@ -183,7 +179,7 @@ export const SendEmail = async (req: Request, res: Response) => {
       });
     }
 
-    if (!modelDoc.exists()) {
+    if (!modelDocSnap.exists()) {
       return res.status(404).json({
         success: false,
         error: "Template de e-mail não encontrado",
@@ -191,8 +187,9 @@ export const SendEmail = async (req: Request, res: Response) => {
       });
     }
 
-    // 3. Configuração segura do transporte
-    const smtpData = smtpConfig.data();
+    const smtpData = smtpConfigSnap.data();
+    const modelData = modelDocSnap.data();
+
     const transporter = nodemailer.createTransport({
       host: smtpData.serverAddress,
       port: smtpData.port,
@@ -200,10 +197,7 @@ export const SendEmail = async (req: Request, res: Response) => {
       requireTLS: smtpData.sslMethod === "TLS",
       auth:
         smtpData.authMethod === "SMTP-AUTH"
-          ? {
-              user: smtpData.authAccount,
-              pass: smtpData.authPassword,
-            }
+          ? { user: smtpData.authAccount, pass: smtpData.authPassword }
           : undefined,
     });
 
@@ -220,7 +214,6 @@ export const SendEmail = async (req: Request, res: Response) => {
 
     const BATCH_SIZE = 5;
     const results = [];
-
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       const batch = recipients.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
@@ -229,21 +222,11 @@ export const SendEmail = async (req: Request, res: Response) => {
             const mailOptions = {
               from: smtpData.emailAddress,
               to: recipient.email,
-              subject: modelDoc.data().title,
-              html: modelDoc.data().body,
-              attachments:
-                recipient.attachments?.map((att) => ({
-                  filename: `${att.filename.replace(
-                    /[^a-zA-Z0-9_-]/g,
-                    ""
-                  )}.pdf`,
-                  content: Buffer.from(att.content, "base64"),
-                  contentType: "application/pdf",
-                })) || [],
+              subject: modelData.title,
+              html: modelData.body,
+              attachments: recipient.attachments || [],
             };
-
             await transporter.sendMail(mailOptions);
-
             return {
               email: recipient.email,
               success: true,
@@ -260,7 +243,6 @@ export const SendEmail = async (req: Request, res: Response) => {
           }
         })
       );
-
       results.push(...batchResults);
     }
 
@@ -274,7 +256,7 @@ export const SendEmail = async (req: Request, res: Response) => {
       details: results,
     });
 
-    res.json({
+    return res.status(200).json({
       success: true,
       logId: logRef.id,
       stats: {
@@ -285,7 +267,7 @@ export const SendEmail = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Erro geral no SendEmail:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: "Erro interno no servidor",
       errorCode: "INTERNAL_SERVER_ERROR",
