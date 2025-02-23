@@ -7,12 +7,12 @@ dotenv.config();
 
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_APIKEY,
-  authDomain: "massemail-b751e.firebaseapp.com",
-  projectId: "massemail-b751e",
-  storageBucket: "massemail-b751e.firebasestorage.app",
-  messagingSenderId: "293773295683",
-  appId: "1:293773295683:web:557fd3f51c11ee75f754f6",
-  measurementId: "G-NSSN54BC9C",
+  authDomain: "massemail-aad98.firebaseapp.com",
+  projectId: "massemail-aad98",
+  storageBucket: "massemail-aad98.firebasestorage.app",
+  messagingSenderId: "595485932915",
+  appId: "1:595485932915:web:8b8bd163b303104b31d906",
+  measurementId: "G-K9NYM1NWZS"
 };
 
 const app = initializeApp(firebaseConfig);

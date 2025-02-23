@@ -8,6 +8,7 @@ import {
   serverTimestamp,
   deleteDoc,
   getDoc,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { FirebaseError } from "firebase/app";
@@ -167,5 +168,42 @@ export const DeleteModel = async (modelId: string) => {
       error: "Erro desconhecido ao excluir modelo",
       errorCode: "UNKNOWN_ERROR",
     };
+  }
+};
+
+export const GetModels = async (req: Request, res: Response) => {
+  try {
+    const modelsRef = collection(db, "models");
+    const querySnapshot = await getDocs(modelsRef);
+
+    const modelsList = querySnapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        title: doc.data().title,
+      }))
+      .filter((model) => model.title); 
+
+    return res.status(200).json({
+      success: true,
+      data: modelsList,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar modelos:", error);
+
+    if (error instanceof FirebaseError) {
+      return res.status(503).json({
+        success: false,
+        error: "Erro no banco de dados",
+        code: error.code,
+      });
+    }
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return res.status(500).json({
+      success: false,
+      error: "Falha na busca de modelos",
+      details: errorMessage,
+    });
   }
 };
