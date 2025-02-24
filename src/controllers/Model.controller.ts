@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { IModelBody } from "../types";
+import { Model as IModelBody } from "../types";
 import {
   addDoc,
   collection,
@@ -181,7 +181,7 @@ export const GetModels = async (req: Request, res: Response) => {
         id: doc.id,
         title: doc.data().title,
       }))
-      .filter((model) => model.title); 
+      .filter((model) => model.title);
 
     return res.status(200).json({
       success: true,

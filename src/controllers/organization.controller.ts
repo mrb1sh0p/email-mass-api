@@ -8,12 +8,19 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { Request, Response } from "express";
-import { db } from "src/firebase";
+import { db } from "../firebase";
+
+interface OrgsProps {
+  name: string;
+  description: string;
+}
 
 export const createOrganization = async (req: Request, res: Response) => {
   try {
-    const { name, description } = req.body;
-    const superAdminId = req.user?.uid;
+    const { name, description } = req.body as OrgsProps;
+    const superAdminId = req.user.user.id;
+
+    console.log(superAdminId);
 
     const orgRef = await addDoc(collection(db, "organizations"), {
       name,
@@ -32,8 +39,17 @@ export const createOrganization = async (req: Request, res: Response) => {
         description,
       },
     });
-  } catch (error) {
-    // Tratamento de erros
+  } catch (error: any) {
+    let status = 500;
+    if (error.code === "invalid-argument") {
+      status = 400;
+    }
+
+    return res.status(status).json({
+      errorCode: error.code || "UNKNOWN_ERROR",
+      errorMessage:
+        error.message || "Ocorreu um erro durante a criação da Org.",
+    });
   }
 };
 

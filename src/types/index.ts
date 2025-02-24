@@ -1,9 +1,10 @@
 import { Timestamp } from "firebase/firestore";
 
-export interface IModelBody {
+export interface Model {
   modelId: string;
   title?: string;
   body?: string;
+  idOrg: string,
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

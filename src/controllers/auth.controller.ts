@@ -6,8 +6,8 @@ import {
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { User } from "src/types";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { User } from "../types";
 
 dotenv.config();
 
@@ -31,7 +31,7 @@ export const registerUser = async (req: Request, res: Response) => {
 
   // Verificar se o criador tem acesso à organização
   if (
-    creator.role === "org-admin" &&
+    (creator.role === "org-admin" || creator.role === "super-admin") &&
     creator.organizationId !== organizationId
   ) {
     return res.status(403).json({
@@ -83,9 +83,22 @@ export const authenticate = async (
       email,
       password
     );
-    const token = jwt.sign({ uid: userCredential.user.uid }, secretKey, {
-      expiresIn: "24h",
-    });
+
+    const userRef = doc(db, "users", userCredential.user.uid);
+    const currentUser = (await getDoc(userRef)).data();
+
+    const token = jwt.sign(
+      {
+        user: {
+          ...currentUser,
+          id: userCredential.user.uid,
+        },
+      },
+      secretKey,
+      {
+        expiresIn: "9h",
+      }
+    );
 
     return res.status(200).json({
       auth: true,

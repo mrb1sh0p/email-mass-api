@@ -8,12 +8,12 @@ import {
   UpdateModel,
 } from "../controllers/model.controller";
 import { SendEmail, SetSMTPConfig } from "../controllers/email.controller";
-import { requireOrgAdmin, requireSuperAdmin } from "src/middleware/auth";
-import { enforceOrgAccess } from "src/middleware/orgs";
+import { requireOrgAdmin, requireSuperAdmin } from "../middleware/auth";
+// import { enforceOrgAccess } from "src/middleware/orgs";
 import {
   assignOrgAdmin,
   createOrganization,
-} from "src/controllers/organization.controller";
+} from "../controllers/organization.controller";
 
 const router = express.Router();
 

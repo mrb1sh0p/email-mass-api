@@ -6,14 +6,15 @@ export const requireSuperAdmin = async (
   res: Response,
   next: NextFunction
 ) => {
-  const user = req.user as User;
+  const { role } = req.user.user as User;
 
-  if (user?.role !== "super-admin") {
+  if (role !== "super-admin") {
     return res.status(403).json({
       success: false,
       error: "Acesso restrito a super administradores",
     });
   }
+
   next();
 };
 
@@ -22,9 +23,9 @@ export const requireOrgAdmin = async (
   res: Response,
   next: NextFunction
 ) => {
-  const user = req.user as User;
+  const { role } = req.user.user as User;
 
-  if (user?.role !== "org-admin") {
+  if (role !== "org-admin") {
     return res.status(403).json({
       success: false,
       error: "Acesso restrito a administradores de organização",
