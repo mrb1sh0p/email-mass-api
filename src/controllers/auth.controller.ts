@@ -6,7 +6,14 @@ import {
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import {
+  arrayUnion,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { User } from "../types";
 
 dotenv.config();
@@ -17,46 +24,66 @@ interface AuthProps {
 }
 
 export const registerUser = async (req: Request, res: Response) => {
-  const { email, password, organizationId } = req.body;
+  try {
+    const { email, password, organizationId } = req.body;
+    const { role, organizationId: userOrgId } = req.user?.user as User;
 
-  // Somente super-admin ou org-admin podem criar usuários
-  const creator = req.user as User;
+    // Verificação de permissões
+    if (role === "user") {
+      return res.status(403).json({
+        success: false,
+        error: "Permissão insuficiente para criar usuários",
+      });
+    }
 
-  if (creator.role === "user") {
-    return res.status(403).json({
-      success: false,
-      error: "Permissão insuficiente para criar usuários",
+    if (role !== "super-admin") {
+      if (role === "org-admin" && userOrgId !== organizationId) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso não autorizado a esta organização",
+        });
+      }
+    }
+
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    await setDoc(doc(db, "users", userCredential.user.uid), {
+      email,
+      role: "user",
+      organizationId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
-  }
 
-  // Verificar se o criador tem acesso à organização
-  if (
-    (creator.role === "org-admin" || creator.role === "super-admin") &&
-    creator.organizationId !== organizationId
-  ) {
-    return res.status(403).json({
-      success: false,
-      error: "Acesso não autorizado a esta organização",
+    await updateDoc(doc(db, "organizations", organizationId), {
+      orgMembers: arrayUnion(userCredential.user.uid),
     });
+
+    return res.status(201).json({
+      success: true,
+      userId: userCredential.user.uid,
+    });
+  } catch (error: any) {
+    console.error("Erro no registro:", error);
+
+    const status = error.code === "auth/email-already-in-use" ? 409 : 500;
+    const errorCode = error.code || "INTERNAL_ERROR";
+    const errorMessage = error.message || "Erro desconhecido";
+
+    if (!res.headersSent) {
+      return res.status(status).json({
+        success: false,
+        errorCode,
+        errorMessage,
+      });
+    }
+
+    console.error("Tentativa de enviar resposta duplicada");
   }
-
-  // Criar usuário no Firebase Auth
-  const userCredential = await createUserWithEmailAndPassword(
-    auth,
-    email,
-    password
-  );
-
-  // Criar registro no Firestore
-  await setDoc(doc(db, "users", userCredential.user.uid), {
-    email,
-    role: "user",
-    organizationId,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-
-  res.status(201).json({ success: true });
 };
 
 export const authenticate = async (
@@ -105,9 +132,6 @@ export const authenticate = async (
       token,
     });
   } catch (error: any) {
-    console.error("Erro na autenticação:", error);
-
-    // Mapeamento de erros comuns do Firebase para status apropriados
     let status = 500;
     if (
       error.code === "auth/wrong-password" ||

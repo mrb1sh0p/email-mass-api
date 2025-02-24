@@ -25,11 +25,14 @@ export const requireOrgAdmin = async (
 ) => {
   const { role } = req.user.user as User;
 
-  if (role !== "org-admin") {
+  if (role === "super-admin") {
+    next();
+  } else if (role !== "org-admin") {
     return res.status(403).json({
       success: false,
       error: "Acesso restrito a administradores de organização",
     });
   }
+
   next();
 };

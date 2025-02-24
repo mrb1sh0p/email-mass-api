@@ -24,6 +24,7 @@ export interface Organization {
   name_lower: string,
   description: string;
   orgAdmins: string[];
+  orgMembers: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

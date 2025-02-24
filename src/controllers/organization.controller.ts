@@ -44,6 +44,7 @@ export const createOrganization = async (req: Request, res: Response) => {
       name_lower: name.toLowerCase(),
       createdBy: superAdminId,
       orgAdmins: [],
+      orgMembers: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -123,7 +124,7 @@ export const getOrganizations = async (req: Request, res: Response) => {
       name: doc.data().name,
       description: doc.data().description,
       createdAt: doc.data().createdAt?.toDate(),
-      memberCount: doc.data().memberCount || 0,
+      memberCount: doc.data().orgMembers.length,
       isAdmin: doc.data().orgAdmins?.includes(id) || false,
     }));
 
@@ -132,6 +133,7 @@ export const getOrganizations = async (req: Request, res: Response) => {
       const countSnapshot = await getCountFromServer(
         collection(db, "organizations")
       );
+      console.log(countSnapshot.data())
       total = countSnapshot.data().count;
     }
 
@@ -166,9 +168,7 @@ export const getOrganizations = async (req: Request, res: Response) => {
 export const assignOrgAdmin = async (req: Request, res: Response) => {
   const { orgId, userId } = req.params;
 
-  const orgDoc = await getDoc(doc(db, "organizations", orgId));
-
-  if (orgDoc.data()?.createdBy !== req.user?.uid) {
+  if (req.user.user.role !== "super-admin") {
     return res.status(403).json({
       success: false,
       error: "Somente o super-admin criador pode designar admins",
