@@ -1,8 +1,13 @@
 import dotenv from "dotenv";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { auth, db } from "../firebase";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { User } from "src/types";
 
 dotenv.config();
 
@@ -10,6 +15,49 @@ interface AuthProps {
   email: string;
   password: string;
 }
+
+export const registerUser = async (req: Request, res: Response) => {
+  const { email, password, organizationId } = req.body;
+
+  // Somente super-admin ou org-admin podem criar usuários
+  const creator = req.user as User;
+
+  if (creator.role === "user") {
+    return res.status(403).json({
+      success: false,
+      error: "Permissão insuficiente para criar usuários",
+    });
+  }
+
+  // Verificar se o criador tem acesso à organização
+  if (
+    creator.role === "org-admin" &&
+    creator.organizationId !== organizationId
+  ) {
+    return res.status(403).json({
+      success: false,
+      error: "Acesso não autorizado a esta organização",
+    });
+  }
+
+  // Criar usuário no Firebase Auth
+  const userCredential = await createUserWithEmailAndPassword(
+    auth,
+    email,
+    password
+  );
+
+  // Criar registro no Firestore
+  await setDoc(doc(db, "users", userCredential.user.uid), {
+    email,
+    role: "user",
+    organizationId,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  res.status(201).json({ success: true });
+};
 
 export const authenticate = async (
   req: Request,
