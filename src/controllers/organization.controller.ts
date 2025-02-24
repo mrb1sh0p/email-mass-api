@@ -17,18 +17,12 @@ import {
 } from "firebase/firestore";
 import { Request, Response } from "express";
 import { db } from "../firebase";
-import { User } from "src/types";
+import { SearchProps, User } from "src/types";
 import { FirebaseError } from "firebase/app";
 
 interface OrgsProps {
   name: string;
   description: string;
-}
-
-interface SearchProps {
-  page?: number;
-  limitValue?: number;
-  search?: string;
 }
 
 export const createOrganization = async (req: Request, res: Response) => {

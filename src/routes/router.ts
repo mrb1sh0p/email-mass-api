@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, registerUser } from "../controllers/auth.controller";
+import { authenticate } from "../controllers/auth.controller";
 import { verifyJWT } from "../middleware/verify";
 import {
   CreateModel,
@@ -9,12 +9,12 @@ import {
 } from "../controllers/model.controller";
 import { SendEmail, SetSMTPConfig } from "../controllers/email.controller";
 import { requireOrgAdmin, requireSuperAdmin } from "../middleware/auth";
-import { enforceOrgAccess } from "src/middleware/orgs";
 import {
   assignOrgAdmin,
   createOrganization,
   getOrganizations,
 } from "../controllers/organization.controller";
+import { listUsers, registerUser } from "../controllers/user.controller";
 
 const router = express.Router();
 
@@ -28,20 +28,19 @@ router.post("/send", verifyJWT, SendEmail);
 
 router.post("/smtp", verifyJWT, requireOrgAdmin, SetSMTPConfig);
 
-
 // Orgs
-router.get("/org", verifyJWT, getOrganizations);
-router.get("/orgs", verifyJWT, requireSuperAdmin, getOrganizations);
-router.post("/organizations", verifyJWT, requireSuperAdmin, createOrganization);
+router.get("/org", verifyJWT, getOrganizations); // lista a organização referente ao usuario
+router.get("/orgs", verifyJWT, requireSuperAdmin, getOrganizations); // lista todas as organizações
+router.post("/organizations", verifyJWT, requireSuperAdmin, createOrganization); // cria um nova orgnanização
 
 router.patch(
   "/organizations/:orgId/admins/:userId",
   verifyJWT,
   requireSuperAdmin,
   assignOrgAdmin
-);
+); // designa um usuario a uma organização
 
-router.post("/users", verifyJWT, requireOrgAdmin, registerUser);
-// router.get("/users", authenticate, enforceOrgAccess, listUsers);
+router.post("/users", verifyJWT, requireOrgAdmin, registerUser); // registra um novo usuario
+router.get("/users", verifyJWT, requireOrgAdmin, listUsers); // lista todos usuarios
 
 export default router;
