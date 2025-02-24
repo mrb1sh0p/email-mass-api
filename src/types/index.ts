@@ -21,6 +21,7 @@ export interface User {
 export interface Organization {
   id: string;
   name: string;
+  name_lower: string,
   description: string;
   orgAdmins: string[];
   createdAt: Timestamp;

@@ -3,16 +3,32 @@ import {
   arrayUnion,
   collection,
   doc,
+  DocumentData,
   getDoc,
+  orderBy,
+  query,
+  Query,
   serverTimestamp,
   updateDoc,
+  where,
+  limit,
+  getDocs,
+  getCountFromServer,
 } from "firebase/firestore";
 import { Request, Response } from "express";
 import { db } from "../firebase";
+import { User } from "src/types";
+import { FirebaseError } from "firebase/app";
 
 interface OrgsProps {
   name: string;
   description: string;
+}
+
+interface SearchProps {
+  page?: number;
+  limitValue?: number;
+  search?: string;
 }
 
 export const createOrganization = async (req: Request, res: Response) => {
@@ -25,6 +41,7 @@ export const createOrganization = async (req: Request, res: Response) => {
     const orgRef = await addDoc(collection(db, "organizations"), {
       name,
       description,
+      name_lower: name.toLowerCase(),
       createdBy: superAdminId,
       orgAdmins: [],
       createdAt: serverTimestamp(),
@@ -53,10 +70,102 @@ export const createOrganization = async (req: Request, res: Response) => {
   }
 };
 
+export const getOrganizations = async (req: Request, res: Response) => {
+  try {
+    const { id, role } = req.user.user as User;
+    const { page = 1, limitValue = 10, search } = req.query as SearchProps;
+
+    const pageNumber = Number(page);
+    const limitNumber = Number(limitValue);
+    // const offsetValue = (pageNumber - 1) * limitNumber;
+
+    let queryRef: Query<DocumentData> = collection(db, "organizations");
+
+    if (role === "super-admin") {
+      if (search) {
+        queryRef = query(
+          queryRef,
+          where("name_lower", ">=", search.toLowerCase()),
+          where("name_lower", "<=", search.toLowerCase() + "\uf8ff"),
+          orderBy("name_lower"),
+          limit(limitNumber)
+        );
+      } else {
+        queryRef = query(
+          queryRef,
+          orderBy("createdAt", "desc"),
+          limit(limitNumber)
+        );
+      }
+    } else if (role === "org-admin") {
+      const userDoc = await getDoc(doc(db, "users", id));
+      const orgId = userDoc.data()?.organizationId;
+
+      if (!orgId) {
+        return res.status(403).json({
+          success: false,
+          error: "Usuário não vinculado a nenhuma organização",
+        });
+      }
+
+      queryRef = query(queryRef, where("__name__", "==", orgId));
+    } else {
+      return res.status(403).json({
+        success: false,
+        error: "Acesso não autorizado",
+      });
+    }
+
+    const snapshot = await getDocs(queryRef);
+
+    const organizations = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      name: doc.data().name,
+      description: doc.data().description,
+      createdAt: doc.data().createdAt?.toDate(),
+      memberCount: doc.data().memberCount || 0,
+      isAdmin: doc.data().orgAdmins?.includes(id) || false,
+    }));
+
+    let total = 0;
+    if (role === "super-admin" && !search) {
+      const countSnapshot = await getCountFromServer(
+        collection(db, "organizations")
+      );
+      total = countSnapshot.data().count;
+    }
+
+    res.json({
+      success: true,
+      data: organizations,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        totalPages: Math.ceil(total / limitNumber),
+      },
+    });
+  } catch (error) {
+    console.error("Erro ao buscar organizações:", error);
+
+    if (error instanceof FirebaseError) {
+      return res.status(503).json({
+        success: false,
+        error: "Erro no banco de dados",
+        code: error.code,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: "Erro interno ao buscar organizações",
+    });
+  }
+};
+
 export const assignOrgAdmin = async (req: Request, res: Response) => {
   const { orgId, userId } = req.params;
 
-  // Verificar se o solicitante é super-admin
   const orgDoc = await getDoc(doc(db, "organizations", orgId));
 
   if (orgDoc.data()?.createdBy !== req.user?.uid) {
@@ -66,7 +175,6 @@ export const assignOrgAdmin = async (req: Request, res: Response) => {
     });
   }
 
-  // Atualizar organização e usuário
   await updateDoc(doc(db, "organizations", orgId), {
     orgAdmins: arrayUnion(userId),
   });

@@ -13,6 +13,7 @@ import { requireOrgAdmin, requireSuperAdmin } from "../middleware/auth";
 import {
   assignOrgAdmin,
   createOrganization,
+  getOrganizations,
 } from "../controllers/organization.controller";
 
 const router = express.Router();
@@ -27,6 +28,8 @@ router.post("/send", verifyJWT, SendEmail);
 
 router.post("/smtp", verifyJWT, requireOrgAdmin, SetSMTPConfig);
 
+router.get("/org", verifyJWT, getOrganizations);
+router.get("/orgs", verifyJWT, requireSuperAdmin, getOrganizations);
 router.post("/organizations", verifyJWT, requireSuperAdmin, createOrganization);
 router.patch(
   "/organizations/:orgId/admins/:userId",
