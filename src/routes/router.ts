@@ -14,7 +14,7 @@ import {
   createOrganization,
   getOrganizations,
 } from "../controllers/organization.controller";
-import { listUsers, registerUser } from "../controllers/user.controller";
+import { listUsers, registerUser,  deleteUserById as deleteUser } from "../controllers/user.controller";
 
 const router = express.Router();
 
@@ -42,5 +42,6 @@ router.patch(
 
 router.post("/users", verifyJWT, requireOrgAdmin, registerUser); // registra um novo usuario
 router.get("/users", verifyJWT, requireOrgAdmin, listUsers); // lista todos usuarios
+router.delete("/users", verifyJWT, requireOrgAdmin, deleteUser); // remove usuarios
 
 export default router;

@@ -1,12 +1,14 @@
 import { Request, Response } from "express";
 import { auth, db } from "../firebase";
-
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import {
+  arrayRemove,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   DocumentData,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -162,21 +164,93 @@ export const listUsers = async (req: Request, res: Response) => {
   }
 };
 
-export const DeleteUser = async (req: Request, res: Response) => {
+export const deleteUserById = async (req: Request, res: Response) => {
   try {
-  } catch (error) {
-    if (error instanceof FirebaseError) {
-      return {
+    const { id: currentUserId, role } = req.user.user as User;
+    const userId = typeof req.query.userId === "string" ? req.query.userId : "";
+
+    if (!userId) {
+      return res.status(400).json({
         success: false,
-        error: `Erro no Firestore: ${error.message}`,
-        errorCode: error.code,
-      };
+        error: "ID do usuário inválido",
+        errorCode: "INVALID_USER_ID",
+      });
     }
 
-    return {
+    if (role === "user") {
+      return res.status(403).json({
+        success: false,
+        error: "Acesso não autorizado",
+        errorCode: "UNAUTHORIZED",
+      });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      return res.status(404).json({
+        success: false,
+        error: "Usuário não encontrado",
+        errorCode: "USER_NOT_FOUND",
+      });
+    }
+
+    if (role === "org-admin" || role === "super-admin") {
+      const userRef = doc(db, "users", currentUserId);
+      const currentUserDoc = await getDoc(userRef);
+
+      if (
+        currentUserDoc.data()?.organizationId !== userDoc.data()?.organizationId
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso restrito à mesma organização",
+          errorCode: "ORG_ACCESS_DENIED",
+        });
+      }
+
+      if (userDoc.data()?.organizationId) {
+        await updateDoc(
+          doc(db, "organizations", userDoc.data().organizationId),
+          {
+            orgMembers: arrayRemove(userId),
+          }
+        );
+      }
+
+      if (userDoc.data()?.role == "org-admin") {
+        await updateDoc(
+          doc(db, "organizations", userDoc.data().organizationId),
+          {
+            orgAdmins: arrayRemove(userId),
+          }
+        );
+      }
+      const deleteRef = doc(db, "users", userId);
+      const deleteUserDoc = await getDoc(deleteRef);
+
+      await deleteDoc(deleteRef);
+      await deleteUser(deleteUserDoc.data()?.uid);
+    }
+
+    return res.json({
+      success: true,
+      message: "Usuário excluído com sucesso",
+    });
+  } catch (error) {
+    console.error("Erro na exclusão:", error);
+
+    if (error instanceof FirebaseError) {
+      return res.status(500).json({
+        success: false,
+        error: `Erro do Firebase: ${error.message}`,
+        errorCode: error.code,
+      });
+    }
+
+    return res.status(500).json({
       success: false,
-      error: "Erro desconhecido ao excluir modelo",
-      errorCode: "UNKNOWN_ERROR",
-    };
+      error: "Erro interno no servidor",
+      errorCode: "INTERNAL_ERROR",
+    });
   }
 };

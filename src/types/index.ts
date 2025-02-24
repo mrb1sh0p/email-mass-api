@@ -15,7 +15,7 @@ export interface User {
   name_lower: string,
   email: string;
   role: "super-admin" | "org-admin" | "user";
-  organizationId: string | null;
+  organizationId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
