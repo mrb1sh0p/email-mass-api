@@ -167,8 +167,10 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
 export const SendEmail = async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user.user as User;
-    const { modelId, recipients, smtpId }: SendEmailRequest = req.body;
-    if (!modelId || !recipients?.length || !smtpId) {
+    const { model: modelId, smtpId } = req.query;
+    const { recipients }: SendEmailRequest = req.body;
+
+    if (!modelId || !smtpId || !recipients?.length) {
       return res.status(400).json({
         success: false,
         error: "modelId, smtpId e recipients são obrigatórios",
@@ -179,8 +181,23 @@ export const SendEmail = async (req: Request, res: Response) => {
     if (!organizationId) {
       return res.status(400).json({
         success: false,
-        error: "Não pertence a nenhum Organização",
-        errorCode: "MISSING_REQUIRED_FIELDS",
+        error: "Usuário não pertence a nenhuma organização",
+        errorCode: "MISSING_ORGANIZATION_ID",
+      });
+    }
+
+    if (typeof smtpId !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "smtpId deve ser uma string",
+        errorCode: "INVALID_SMTPID",
+      });
+    }
+    if (typeof modelId !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "modelId deve ser uma string",
+        errorCode: "INVALID_MODELID",
       });
     }
 
@@ -202,8 +219,8 @@ export const SendEmail = async (req: Request, res: Response) => {
     }
 
     const [smtpConfigSnap, modelDocSnap] = await Promise.all([
-      getDoc(doc(db, organizationId, "smtpConfigs", smtpId)),
-      getDoc(doc(db, organizationId, "models", modelId)),
+      getDoc(doc(db, "smtpConfigs", organizationId, "smtpConfigs", smtpId)),
+      getDoc(doc(db, "models", organizationId, "models", modelId)),
     ]);
 
     if (!smtpConfigSnap.exists()) {
@@ -280,22 +297,20 @@ export const SendEmail = async (req: Request, res: Response) => {
       );
       results.push(...batchResults);
     }
-
-    if (!organizationId) return;
-
-    const logRef = await addDoc(collection(db, organizationId, "emailLogs"), {
-      modelId,
-      smtpId,
-      timestamp: serverTimestamp(),
-      totalRecipients: recipients.length,
-      successCount: results.filter((r) => r.success).length,
-      errorCount: results.filter((r) => !r.success).length,
-      details: results,
-    });
+    
+    // const logRef = await addDoc(collection(db, organizationId, "emailLogs"), {
+    //   modelId,
+    //   smtpId,
+    //   timestamp: serverTimestamp(),
+    //   totalRecipients: recipients.length,
+    //   successCount: results.filter((r) => r.success).length,
+    //   errorCount: results.filter((r) => !r.success).length,
+    //   details: results,
+    // });
 
     return res.status(200).json({
       success: true,
-      logId: logRef.id,
+      // logId: logRef.id,
       stats: {
         sent: results.filter((r) => r.success).length,
         failed: results.filter((r) => !r.success).length,

@@ -30,21 +30,20 @@ router.delete("/model", verifyJWT, DeleteModel);
 router.get("/models", verifyJWT, GetModels);
 router.post("/send", verifyJWT, SendEmail); // envia os emails
 
-router.post("/smtp", verifyJWT, requireOrgAdmin, SetSMTPConfig); // registro o smtp da org
+router.post("/smtp", verifyJWT, requireOrgAdmin, SetSMTPConfig);
 
-router.get("/org", verifyJWT, getOrganizations); // lista a organização referente ao usuario
-router.get("/orgs", verifyJWT, requireSuperAdmin, getOrganizations); // lista todas as organizações
-router.post("/organizations", verifyJWT, requireSuperAdmin, createOrganization); // cria um nova orgnanização
-
+router.get("/org", verifyJWT, getOrganizations);
+router.get("/orgs", verifyJWT, requireSuperAdmin, getOrganizations);
+router.post("/organizations", verifyJWT, requireSuperAdmin, createOrganization);
 router.patch(
   "/organizations/:orgId/admins/:userId",
   verifyJWT,
   requireSuperAdmin,
   assignOrgAdmin
-); // designa um usuario a uma organização
+);
 
-router.post("/users", verifyJWT, requireOrgAdmin, registerUser); // registra um novo usuario
-router.get("/users", verifyJWT, requireOrgAdmin, listUsers); // lista todos usuarios
-router.delete("/users", verifyJWT, requireOrgAdmin, deleteUser); // remove usuarios
+router.post("/users", verifyJWT, requireOrgAdmin, registerUser);
+router.get("/users", verifyJWT, requireOrgAdmin, listUsers);
+router.delete("/users", verifyJWT, requireOrgAdmin, deleteUser);
 
 export default router;
