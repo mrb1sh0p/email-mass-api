@@ -24,15 +24,14 @@ const router = express.Router();
 
 router.post("/auth", authenticate);
 
-router.post("/model", verifyJWT, CreateModel); // cria um modelo novo
-router.put("/model", verifyJWT, UpdateModel); // atualiza um modelo especifico
-router.delete("/model", verifyJWT, DeleteModel); // delete um modelo especiico
-router.get("/models", verifyJWT, GetModels); // pega todos modelos da organização
-router.post("/send", verifyJWT, SendEmail);
+router.post("/model", verifyJWT, CreateModel);
+router.put("/model", verifyJWT, UpdateModel);
+router.delete("/model", verifyJWT, DeleteModel);
+router.get("/models", verifyJWT, GetModels);
+router.post("/send", verifyJWT, SendEmail); // envia os emails
 
 router.post("/smtp", verifyJWT, requireOrgAdmin, SetSMTPConfig); // registro o smtp da org
 
-// Orgs
 router.get("/org", verifyJWT, getOrganizations); // lista a organização referente ao usuario
 router.get("/orgs", verifyJWT, requireSuperAdmin, getOrganizations); // lista todas as organizações
 router.post("/organizations", verifyJWT, requireSuperAdmin, createOrganization); // cria um nova orgnanização

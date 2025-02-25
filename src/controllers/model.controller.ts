@@ -33,7 +33,7 @@ export const CreateModel = async (req: Request, res: Response) => {
       });
     }
 
-    const modelsRef = collection(db, organizationId, "models");
+    const modelsRef = collection(db, "models", organizationId, "models");
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
 
@@ -79,7 +79,8 @@ export const CreateModel = async (req: Request, res: Response) => {
 export const UpdateModel = async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user.user as User;
-    const { modelId, title, body }: Partial<IModelBody> & { modelId?: string } =
+    const { model: modelId } = req.query;
+    const { title, body }: Partial<IModelBody> & { modelId?: string } =
       req.body;
 
     if (!modelId) {
@@ -111,7 +112,9 @@ export const UpdateModel = async (req: Request, res: Response) => {
       });
     }
 
-    const modelDocRef = doc(db, organizationId, "models", modelId);
+    if (typeof modelId !== "string") throw new Error();
+
+    const modelDocRef = doc(db, "models", organizationId, "models", modelId);
     await updateDoc(modelDocRef, updateData);
     const updatedDocSnap = await getDoc(modelDocRef);
     const updatedData = updatedDocSnap.data();
@@ -138,13 +141,11 @@ export const UpdateModel = async (req: Request, res: Response) => {
   }
 };
 
-export const DeleteModel = async (
-  modelId: string,
-  req: Request,
-  res: Response
-) => {
+export const DeleteModel = async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user.user as User;
+    const { model: modelId } = req.query;
+
     if (!modelId || typeof modelId !== "string" || modelId.trim() === "") {
       return {
         success: false,
@@ -160,9 +161,9 @@ export const DeleteModel = async (
       });
     }
 
-    const modelRef = doc(db, organizationId, "models", modelId);
+    const modelRef = doc(db, "models", organizationId, "models", modelId);
     const docSnapshot = await getDoc(modelRef);
-    
+
     if (!docSnapshot.exists()) {
       return {
         success: false,
@@ -171,18 +172,15 @@ export const DeleteModel = async (
       };
     }
 
-    await updateDoc(modelRef, {
-      deletedAt: serverTimestamp(),
-    });
     await deleteDoc(modelRef);
-
-    return {
+    return res.status(200).json({
       success: true,
       message: "Modelo excluído com sucesso",
       deletedId: modelId,
       deletedAt: new Date().toISOString(),
-    };
+    });
   } catch (error) {
+    const { modelId } = req.query;
     console.error(`Erro ao excluir modelo ${modelId}:`, error);
 
     if (error instanceof FirebaseError) {
@@ -212,7 +210,7 @@ export const GetModels = async (req: Request, res: Response) => {
       });
     }
 
-    const modelsRef = collection(db, organizationId, "models");
+    const modelsRef = collection(db, "models", organizationId, "models");
     const querySnapshot = await getDocs(modelsRef);
 
     const modelsList = querySnapshot.docs

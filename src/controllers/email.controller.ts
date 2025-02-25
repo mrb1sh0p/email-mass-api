@@ -9,6 +9,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -63,8 +64,16 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
       "sslMethod",
       "emailAddress",
     ];
-
     const missingFields = requiredFields.filter((field) => !smtpConfig[field]);
+
+    if (!req.user || !req.user.user || !req.user.user.uid) {
+      return res.status(401).json({
+        success: false,
+        error: "Usuário não autenticado",
+        errorCode: "UNAUTHENTICATED",
+      });
+    }
+
     if (missingFields.length > 0) {
       return res.status(400).json({
         success: false,
@@ -100,41 +109,43 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
       });
     }
 
-    // Possível implementação de criptografia para authPassword vat ser adicionada aqui.
-    const smtpConfigsRef = collection(db, organizationId, "smtpConfigs");
-    const querySnapshot = await getDocs(
-      query(smtpConfigsRef, where("userId", "==", userId))
+    const smtpConfigsRef = collection(
+      db,
+      "smtpConfigs",
+      organizationId,
+      "smtpConfigs"
     );
 
-    let docRef;
-    if (!querySnapshot.empty) {
-      docRef = querySnapshot.docs[0].ref;
-      await updateDoc(docRef, {
+    const existingConfigsSnapshot = await getDocs(smtpConfigsRef);
+    console.log(existingConfigsSnapshot.empty);
+    if (!existingConfigsSnapshot.empty) {
+      const existingDoc = existingConfigsSnapshot.docs[0];
+      await updateDoc(existingDoc.ref, {
         ...smtpConfig,
+        userId,
         updatedAt: serverTimestamp(),
       });
+
+      return res.status(200).json({
+        success: true,
+        message: "Configuração SMTP atualizada com sucesso",
+        data: { id: existingDoc.id },
+      });
     } else {
-      docRef = await addDoc(smtpConfigsRef, {
+      const newDocRef = await addDoc(smtpConfigsRef, {
         ...smtpConfig,
         userId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      return res.status(200).json({
+        success: true,
+        message: "Configuração SMTP salva com sucesso",
+        data: { id: newDocRef.id },
+      });
     }
-
-    const updatedDoc = await getDoc(docRef);
-    const configData = updatedDoc.data();
-
-    if (configData?.authPassword) {
-      delete configData.authPassword;
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Configuração SMTP salva com sucesso",
-      data: { id: docRef.id, ...configData },
-    });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro na configuração SMTP:", error);
 
     if (error instanceof FirebaseError) {
@@ -155,6 +166,7 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
 
 export const SendEmail = async (req: Request, res: Response) => {
   try {
+    const { organizationId } = req.user.user as User;
     const { modelId, recipients, smtpId }: SendEmailRequest = req.body;
     if (!modelId || !recipients?.length || !smtpId) {
       return res.status(400).json({
@@ -164,7 +176,14 @@ export const SendEmail = async (req: Request, res: Response) => {
       });
     }
 
-    // Validação prévia dos anexos para todos os destinatários
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Não pertence a nenhum Organização",
+        errorCode: "MISSING_REQUIRED_FIELDS",
+      });
+    }
+
     for (const recipient of recipients) {
       if (recipient.attachments) {
         try {
@@ -183,8 +202,8 @@ export const SendEmail = async (req: Request, res: Response) => {
     }
 
     const [smtpConfigSnap, modelDocSnap] = await Promise.all([
-      getDoc(doc(db, "smtpConfigs", smtpId)),
-      getDoc(doc(db, "models", modelId)),
+      getDoc(doc(db, organizationId, "smtpConfigs", smtpId)),
+      getDoc(doc(db, organizationId, "models", modelId)),
     ]);
 
     if (!smtpConfigSnap.exists()) {
@@ -262,7 +281,9 @@ export const SendEmail = async (req: Request, res: Response) => {
       results.push(...batchResults);
     }
 
-    const logRef = await addDoc(collection(db, "emailLogs"), {
+    if (!organizationId) return;
+
+    const logRef = await addDoc(collection(db, organizationId, "emailLogs"), {
       modelId,
       smtpId,
       timestamp: serverTimestamp(),
