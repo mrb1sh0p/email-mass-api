@@ -34,6 +34,7 @@ export const registerUser = async (req: Request, res: Response) => {
     const { email, password, organizationId, name } = req.body as UserPorps;
     const { role, organizationId: userOrgId } = req.user?.user as User;
 
+    // Bloqueia criação se o usuário autenticado não tiver permissão
     if (role === "user") {
       return res.status(403).json({
         success: false,
@@ -41,15 +42,19 @@ export const registerUser = async (req: Request, res: Response) => {
       });
     }
 
-    if (role !== "super-admin") {
-      if (role === "org-admin" && userOrgId !== organizationId) {
-        return res.status(403).json({
-          success: false,
-          error: "Acesso não autorizado a esta organização",
-        });
-      }
+    // Se não for super-admin, e for org-admin, só pode criar usuários da mesma organização
+    if (
+      role !== "super-admin" &&
+      role === "org-admin" &&
+      userOrgId !== organizationId
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: "Acesso não autorizado a esta organização",
+      });
     }
 
+    // Cria o usuário no Firebase Auth
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
@@ -64,10 +69,10 @@ export const registerUser = async (req: Request, res: Response) => {
       organizationId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
-
-    await updateDoc(doc(db, "organizations", organizationId), {
-      orgMembers: arrayUnion(userCredential.user.uid),
+    }).then(() => {
+      updateDoc(doc(db, "organizations", organizationId), {
+        orgMembers: arrayUnion(userCredential.user.uid),
+      });
     });
 
     return res.status(201).json({
@@ -77,19 +82,21 @@ export const registerUser = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Erro no registro:", error);
 
+    // Se os headers já foram enviados, não tenta enviar outra resposta
+    if (res.headersSent) {
+      console.error("Tentativa de enviar resposta duplicada");
+      return;
+    }
+
     const status = error.code === "auth/email-already-in-use" ? 409 : 500;
     const errorCode = error.code || "INTERNAL_ERROR";
     const errorMessage = error.message || "Erro desconhecido";
 
-    if (!res.headersSent) {
-      return res.status(status).json({
-        success: false,
-        errorCode,
-        errorMessage,
-      });
-    }
-
-    console.error("Tentativa de enviar resposta duplicada");
+    return res.status(status).json({
+      success: false,
+      errorCode,
+      errorMessage,
+    });
   }
 };
 
@@ -194,43 +201,53 @@ export const deleteUserById = async (req: Request, res: Response) => {
       });
     }
 
-    if (role === "org-admin" || role === "super-admin") {
-      const userRef = doc(db, "users", currentUserId);
-      const currentUserDoc = await getDoc(userRef);
+    const userData = userDoc.data();
+    console.log(userData);
+    if (!userData) {
+      return res.status(500).json({
+        success: false,
+        error: "Dados do usuário inválidos",
+        errorCode: "INVALID_USER_DATA",
+      });
+    }
 
-      if (
-        currentUserDoc.data()?.organizationId !== userDoc.data()?.organizationId
-      ) {
+    if (role === "org-admin") {
+      const currentUserDoc = await getDoc(doc(db, "users", currentUserId));
+      if (currentUserDoc.data()?.organizationId !== userData.organizationId) {
         return res.status(403).json({
           success: false,
           error: "Acesso restrito à mesma organização",
           errorCode: "ORG_ACCESS_DENIED",
         });
       }
-
-      if (userDoc.data()?.organizationId) {
-        await updateDoc(
-          doc(db, "organizations", userDoc.data().organizationId),
-          {
-            orgMembers: arrayRemove(userId),
-          }
-        );
-      }
-
-      if (userDoc.data()?.role == "org-admin") {
-        await updateDoc(
-          doc(db, "organizations", userDoc.data().organizationId),
-          {
-            orgAdmins: arrayRemove(userId),
-          }
-        );
-      }
-      const deleteRef = doc(db, "users", userId);
-      const deleteUserDoc = await getDoc(deleteRef);
-
-      await deleteDoc(deleteRef);
-      await deleteUser(deleteUserDoc.data()?.uid);
     }
+
+    const userRef = doc(db, "users", userId);
+
+    if (!userData.uid) {
+      return res.status(500).json({
+        success: false,
+        error: "UID do usuário não encontrado",
+        errorCode: "UID_NOT_FOUND",
+      });
+    }
+    await deleteUser(userData.uid);
+
+    if (userData.organizationId) {
+      const orgRef = doc(db, "organizations", userData.organizationId);
+
+      if (userData.role === "org-admin") {
+        await updateDoc(orgRef, {
+          orgAdmins: arrayRemove(userId),
+        });
+      }
+
+      await updateDoc(orgRef, {
+        orgMembers: arrayRemove(userId),
+      });
+    }
+
+    await deleteDoc(userRef);
 
     return res.json({
       success: true,
@@ -238,7 +255,6 @@ export const deleteUserById = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Erro na exclusão:", error);
-
     if (error instanceof FirebaseError) {
       return res.status(500).json({
         success: false,
@@ -246,7 +262,6 @@ export const deleteUserById = async (req: Request, res: Response) => {
         errorCode: error.code,
       });
     }
-
     return res.status(500).json({
       success: false,
       error: "Erro interno no servidor",
