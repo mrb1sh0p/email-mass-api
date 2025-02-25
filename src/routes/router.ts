@@ -19,6 +19,7 @@ import {
   registerUser,
   deleteUserById as deleteUser,
 } from "../controllers/user.controller";
+import { listLogs } from "../controllers/logs.controller";
 
 const router = express.Router();
 
@@ -28,7 +29,7 @@ router.post("/model", verifyJWT, CreateModel);
 router.put("/model", verifyJWT, UpdateModel);
 router.delete("/model", verifyJWT, DeleteModel);
 router.get("/models", verifyJWT, GetModels);
-router.post("/send", verifyJWT, SendEmail); // envia os emails
+router.post("/send", verifyJWT, SendEmail);
 
 router.post("/smtp", verifyJWT, requireOrgAdmin, SetSMTPConfig);
 
@@ -45,5 +46,7 @@ router.patch(
 router.post("/users", verifyJWT, requireOrgAdmin, registerUser);
 router.get("/users", verifyJWT, requireOrgAdmin, listUsers);
 router.delete("/users", verifyJWT, requireOrgAdmin, deleteUser);
+
+router.get("/emailLogs", verifyJWT, requireOrgAdmin, listLogs);
 
 export default router;
