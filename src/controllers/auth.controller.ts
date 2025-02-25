@@ -2,7 +2,8 @@ import dotenv from "dotenv";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 dotenv.config();
 
@@ -35,18 +36,27 @@ export const authenticate = async (
       email,
       password
     );
-    const token = jwt.sign({ uid: userCredential.user.uid }, secretKey, {
-      expiresIn: "24h",
-    });
+
+    const userRef = doc(db, "users", userCredential.user.uid);
+    const currentUser = (await getDoc(userRef)).data();
+    const token = jwt.sign(
+      {
+        user: {
+          ...currentUser,
+          id: userCredential.user.uid,
+        },
+      },
+      secretKey,
+      {
+        expiresIn: "9h",
+      }
+    );
 
     return res.status(200).json({
       auth: true,
       token,
     });
   } catch (error: any) {
-    console.error("Erro na autenticação:", error);
-
-    // Mapeamento de erros comuns do Firebase para status apropriados
     let status = 500;
     if (
       error.code === "auth/wrong-password" ||
