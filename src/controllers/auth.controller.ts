@@ -1,15 +1,9 @@
 import dotenv from "dotenv";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import {
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebase";
-import {
-  doc,
-  getDoc,
-} from "firebase/firestore";
-
+import { doc, getDoc } from "firebase/firestore";
 
 dotenv.config();
 
@@ -45,7 +39,6 @@ export const authenticate = async (
 
     const userRef = doc(db, "users", userCredential.user.uid);
     const currentUser = (await getDoc(userRef)).data();
-
     const token = jwt.sign(
       {
         user: {
@@ -78,4 +71,3 @@ export const authenticate = async (
     });
   }
 };
-
