@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 import { SMTPConfig } from "../types/emails.types";
+import { User } from "../types";
 
 interface Attachment {
   filename: string;
@@ -52,8 +53,8 @@ const validatePDF = (attachment: Attachment) => {
 
 export const SetSMTPConfig = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.uid;
-    const smtpConfig: SMTPConfig = req.body;
+    const { id: userId, organizationId, role } = req.user.user as User;
+    const { smtpConfig, orgId } = req.body;
 
     const requiredFields: (keyof SMTPConfig)[] = [
       "serverAddress",
@@ -84,8 +85,23 @@ export const SetSMTPConfig = async (req: Request, res: Response) => {
       });
     }
 
-    // Possível implementação de criptografia para authPassword pode ser adicionada aqui.
-    const smtpConfigsRef = collection(db, "smtpConfigs");
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "organizationId é obrigatório",
+        errorCode: "MISSING_ORGANIZATION_ID",
+      });
+    }
+
+    if (organizationId !== orgId || role === "user") {
+      return res.status(403).json({
+        success: false,
+        error: "Você não tem autorização para acessar essa área",
+      });
+    }
+
+    // Possível implementação de criptografia para authPassword vat ser adicionada aqui.
+    const smtpConfigsRef = collection(db, organizationId, "smtpConfigs");
     const querySnapshot = await getDocs(
       query(smtpConfigsRef, where("userId", "==", userId))
     );

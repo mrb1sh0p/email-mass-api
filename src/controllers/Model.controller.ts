@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Model as IModelBody } from "../types";
+import { Model as IModelBody, User } from "../types";
 import {
   addDoc,
   collection,
@@ -15,7 +15,16 @@ import { FirebaseError } from "firebase/app";
 
 export const CreateModel = async (req: Request, res: Response) => {
   try {
-    const { title, body }: IModelBody = req.body;
+    const { organizationId, role } = req.user.user as User;
+    const { title, body, idOrg }: IModelBody = req.body;
+
+    if (organizationId !== idOrg || role === "user") {
+      return res.status(403).json({
+        success: false,
+        error: "Você não tem autorização para acessar essa área",
+      });
+    }
+
     if (!title || !body) {
       return res.status(400).json({
         success: false,
@@ -24,7 +33,7 @@ export const CreateModel = async (req: Request, res: Response) => {
       });
     }
 
-    const modelsRef = collection(db, "models");
+    const modelsRef = collection(db, organizationId, "models");
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
 
@@ -69,6 +78,7 @@ export const CreateModel = async (req: Request, res: Response) => {
 
 export const UpdateModel = async (req: Request, res: Response) => {
   try {
+    const { organizationId } = req.user.user as User;
     const { modelId, title, body }: Partial<IModelBody> & { modelId?: string } =
       req.body;
 
@@ -94,7 +104,14 @@ export const UpdateModel = async (req: Request, res: Response) => {
       });
     }
 
-    const modelDocRef = doc(db, "models", modelId);
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Falha ao buscar o id da organização",
+      });
+    }
+
+    const modelDocRef = doc(db, organizationId, "models", modelId);
     await updateDoc(modelDocRef, updateData);
     const updatedDocSnap = await getDoc(modelDocRef);
     const updatedData = updatedDocSnap.data();
@@ -121,8 +138,13 @@ export const UpdateModel = async (req: Request, res: Response) => {
   }
 };
 
-export const DeleteModel = async (modelId: string) => {
+export const DeleteModel = async (
+  modelId: string,
+  req: Request,
+  res: Response
+) => {
   try {
+    const { organizationId } = req.user.user as User;
     if (!modelId || typeof modelId !== "string" || modelId.trim() === "") {
       return {
         success: false,
@@ -131,8 +153,16 @@ export const DeleteModel = async (modelId: string) => {
       };
     }
 
-    const modelRef = doc(db, "models", modelId);
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Falha ao buscar o id da organização",
+      });
+    }
+
+    const modelRef = doc(db, organizationId, "models", modelId);
     const docSnapshot = await getDoc(modelRef);
+    
     if (!docSnapshot.exists()) {
       return {
         success: false,
@@ -173,7 +203,16 @@ export const DeleteModel = async (modelId: string) => {
 
 export const GetModels = async (req: Request, res: Response) => {
   try {
-    const modelsRef = collection(db, "models");
+    const { organizationId } = req.user.user as User;
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Falha ao buscar o id da organização",
+      });
+    }
+
+    const modelsRef = collection(db, organizationId, "models");
     const querySnapshot = await getDocs(modelsRef);
 
     const modelsList = querySnapshot.docs
