@@ -266,6 +266,12 @@ export const SendEmail = async (req: Request, res: Response) => {
 
     const BATCH_SIZE = 5;
     const results = [];
+    const attachments: {
+      filename: string;
+      content: string;
+      contentType: string;
+    }[] = [];
+
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       const batch = recipients.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
@@ -278,7 +284,17 @@ export const SendEmail = async (req: Request, res: Response) => {
               html: modelData.body,
               attachments: recipient.attachments || [],
             };
-            await transporter.sendMail(mailOptions);
+            await transporter.sendMail(mailOptions).then(() => {});
+            const attachment: {
+              filename: string;
+              content: string;
+              contentType: string;
+            } = {
+              filename: recipient.attachments![i].filename,
+              content: recipient.attachments![i].content.toString("base64"),
+              contentType: recipient.attachments![i].contentType,
+            };
+            attachments.push(attachment);
             return {
               email: recipient.email,
               success: true,
@@ -297,16 +313,22 @@ export const SendEmail = async (req: Request, res: Response) => {
       );
       results.push(...batchResults);
     }
-    
-    // const logRef = await addDoc(collection(db, organizationId, "emailLogs"), {
-    //   modelId,
-    //   smtpId,
-    //   timestamp: serverTimestamp(),
-    //   totalRecipients: recipients.length,
-    //   successCount: results.filter((r) => r.success).length,
-    //   errorCount: results.filter((r) => !r.success).length,
-    //   details: results,
-    // });
+
+    console.log(attachments);
+
+    const logRef = await addDoc(
+      collection(db, "emailLogs", organizationId, "emailLogs"),
+      {
+        modelId,
+        smtpId,
+        timestamp: serverTimestamp(),
+        attachments: { ...attachments! },
+        totalRecipients: recipients.length,
+        successCount: results.filter((r) => r.success).length,
+        errorCount: results.filter((r) => !r.success).length,
+        details: results,
+      }
+    );
 
     return res.status(200).json({
       success: true,
