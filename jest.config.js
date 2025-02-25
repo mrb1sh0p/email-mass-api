@@ -1,47 +1,49 @@
 module.exports = {
-  // Configurações básicas
+  // Define que o Jest usará o preset "ts-jest" para compilar TypeScript
   preset: "ts-jest",
+
+  // Define o ambiente de testes como Node.js (útil para aplicações backend)
   testEnvironment: "node",
 
-  // Extensões de arquivo que o Jest deve considerar
+  // Extensões de arquivos que o Jest deve reconhecer como módulos válidos
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
 
-  // Padrão para encontrar arquivos de teste
+  // Padrão para localizar arquivos de teste na estrutura do projeto
   testMatch: [
-    "**/__tests__/**/*.test.[jt]s?(x)", // Arquivos .test.ts ou .test.js
-    "**/?(*.)+(spec|test).[jt]s?(x)", // Arquivos .spec.ts ou .spec.js
+    "**/__tests__/**/*.test.[jt]s?(x)", // Testes dentro da pasta __tests__
+    "**/?(*.)+(spec|test).[jt]s?(x)", // Arquivos que terminam em .spec ou .test
   ],
 
-  // Transformações de arquivo
+  // Configurações para transformar arquivos antes da execução dos testes
   transform: {
-    "^.+\\.ts$": "ts-jest", // Compila TypeScript antes dos testes
+    "^.+\\.ts$": "ts-jest", // Compila arquivos TypeScript usando ts-jest
   },
 
-  // Cobertura de código
+  // Configuração para coleta de cobertura de código
   collectCoverage: true,
-  coverageDirectory: "coverage",
-  coverageReporters: ["text", "lcov", "clover"],
+  coverageDirectory: "coverage", // Diretório onde será salva a cobertura
+  coverageReporters: ["text", "lcov", "clover"], // Formatos de saída da cobertura
   coveragePathIgnorePatterns: [
-    "/node_modules/",
-    "/__tests__/",
-    "/dist/",
-    "/coverage/",
+    "/node_modules/", // Ignora dependências
+    "/__tests__/", // Ignora arquivos de teste
+    "/dist/", // Ignora arquivos de build
+    "/coverage/", // Ignora pasta de relatórios de cobertura
   ],
 
-  // Mapeamento de aliases (se estiver usando paths no tsconfig.json)
+  // Mapeamento de aliases de caminho (compatível com paths do tsconfig.json)
   moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/src/$1", // Exemplo de alias @/ para src/
+    "^@/(.*)$": "<rootDir>/src/$1", // Permite importar com "@/caminho" ao invés de "../../src/caminho"
   },
 
-  // Limite de tempo para cada teste (em milissegundos)
-  testTimeout: 10000, // 10 segundos
+  // Define um tempo limite para execução de cada teste (10 segundos)
+  testTimeout: 10000,
 
-  // Ignorar pastas específicas
+  // Ignora determinadas pastas para evitar execução desnecessária de testes
   testPathIgnorePatterns: ["/node_modules/", "/dist/", "/coverage/"],
 
-  // Configurações de watch mode
+  // Define arquivos e pastas que não devem ser observados pelo watch mode
   watchPathIgnorePatterns: ["/node_modules/", "/dist/", "/coverage/"],
 
-  // Configurações de verbosidade
+  // Ativa a saída detalhada dos testes no console
   verbose: true,
 };
