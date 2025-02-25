@@ -274,9 +274,6 @@ export const GetModels = async (req: Request, res: Response) => {
       data: modelsList,
     });
   } catch (error) {
-    // Loga o erro para debug
-    console.error("Erro ao buscar modelos:", error);
-
     // Se for um erro do Firebase, retorna status 503
     if (error instanceof FirebaseError) {
       return res.status(503).json({
