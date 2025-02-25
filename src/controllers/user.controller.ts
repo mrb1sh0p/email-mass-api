@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { auth, db } from "../firebase";
-import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   arrayRemove,
   arrayUnion,
@@ -62,6 +62,7 @@ export const registerUser = async (req: Request, res: Response) => {
     );
 
     await setDoc(doc(db, "users", userCredential.user.uid), {
+      uid: userCredential.user.uid,
       name,
       name_lower: name.toLowerCase(),
       email,
@@ -102,7 +103,7 @@ export const registerUser = async (req: Request, res: Response) => {
 
 export const listUsers = async (req: Request, res: Response) => {
   try {
-    const { id, role, organizationId } = req.user.user as User;
+    const { uid, role, organizationId } = req.user.user as User;
     const { page = 1, limitValue = 10, search } = req.query as SearchProps;
 
     let queryRef: Query<DocumentData> = collection(db, "users");
@@ -173,7 +174,7 @@ export const listUsers = async (req: Request, res: Response) => {
 
 export const deleteUserById = async (req: Request, res: Response) => {
   try {
-    const { id: currentUserId, role } = req.user.user as User;
+    const { uid: currentUserId, organizationId, role } = req.user.user as User;
     const userId = typeof req.query.userId === "string" ? req.query.userId : "";
 
     if (!userId) {
@@ -193,6 +194,7 @@ export const deleteUserById = async (req: Request, res: Response) => {
     }
 
     const userDoc = await getDoc(doc(db, "users", userId));
+
     if (!userDoc.exists()) {
       return res.status(404).json({
         success: false,
@@ -202,7 +204,6 @@ export const deleteUserById = async (req: Request, res: Response) => {
     }
 
     const userData = userDoc.data();
-    console.log(userData);
     if (!userData) {
       return res.status(500).json({
         success: false,
@@ -212,8 +213,7 @@ export const deleteUserById = async (req: Request, res: Response) => {
     }
 
     if (role === "org-admin") {
-      const currentUserDoc = await getDoc(doc(db, "users", currentUserId));
-      if (currentUserDoc.data()?.organizationId !== userData.organizationId) {
+      if (organizationId !== userData.organizationId) {
         return res.status(403).json({
           success: false,
           error: "Acesso restrito à mesma organização",
@@ -231,7 +231,6 @@ export const deleteUserById = async (req: Request, res: Response) => {
         errorCode: "UID_NOT_FOUND",
       });
     }
-    await deleteUser(userData.uid);
 
     if (userData.organizationId) {
       const orgRef = doc(db, "organizations", userData.organizationId);

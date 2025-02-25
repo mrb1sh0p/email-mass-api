@@ -53,7 +53,7 @@ const validatePDF = (attachment: Attachment) => {
 
 export const SetSMTPConfig = async (req: Request, res: Response) => {
   try {
-    const { id: userId, organizationId, role } = req.user.user as User;
+    const { uid: userId, organizationId, role } = req.user.user as User;
     const { smtpConfig, orgId } = req.body;
 
     const requiredFields: (keyof SMTPConfig)[] = [

@@ -10,7 +10,7 @@ export interface Model {
 }
 
 export interface User {
-  id: string;
+  uid: string;
   name: string,
   name_lower: string,
   email: string;

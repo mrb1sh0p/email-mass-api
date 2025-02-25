@@ -67,7 +67,7 @@ export const createOrganization = async (req: Request, res: Response) => {
 
 export const getOrganizations = async (req: Request, res: Response) => {
   try {
-    const { id, role } = req.user.user as User;
+    const { uid, role } = req.user.user as User;
     const { page = 1, limitValue = 10, search } = req.query as SearchProps;
 
     const pageNumber = Number(page);
@@ -93,7 +93,7 @@ export const getOrganizations = async (req: Request, res: Response) => {
         );
       }
     } else if (role === "org-admin") {
-      const userDoc = await getDoc(doc(db, "users", id));
+      const userDoc = await getDoc(doc(db, "users", uid));
       const orgId = userDoc.data()?.organizationId;
 
       if (!orgId) {
@@ -119,7 +119,7 @@ export const getOrganizations = async (req: Request, res: Response) => {
       description: doc.data().description,
       createdAt: doc.data().createdAt?.toDate(),
       memberCount: doc.data().orgMembers.length,
-      isAdmin: doc.data().orgAdmins?.includes(id) || false,
+      isAdmin: doc.data().orgAdmins?.includes(uid) || false,
     }));
 
     let total = 0;
