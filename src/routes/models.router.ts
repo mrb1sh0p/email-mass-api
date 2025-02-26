@@ -1,6 +1,6 @@
 // imports
 import express from "express";
-import { verifyJWT } from "src/middleware/verify";
+import { verifyJWT } from "../middleware/verify";
 import {
   CreateModel,
   DeleteModel,
