@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import { models, orgs, router, user } from "./routes/routes";
 
 const app = express();
+const PORT = process.env.PORT || 3030;
 
 // Habilita o CORS para permitir requisições de diferentes origens
 app.use(cors());
@@ -30,6 +31,6 @@ app.use(orgs); // Rotar para gerenciar orgs
 app.use(models); // Rotar para gerenciar modelos
 
 // Inicia o servidor na porta 3030
-app.listen(3030, () => {
-  console.log("Server is running on port 3030");
+app.listen(PORT, () => {
+  console.log(`Server is running on port: ${PORT}`);
 });

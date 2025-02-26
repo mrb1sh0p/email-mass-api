@@ -329,12 +329,13 @@ export const SendEmail = async (req: Request, res: Response) => {
             const mailOptions = {
               from: smtpData.emailAddress,
               to: recipient.email,
+              cc: smtpData.emailAddress,
               subject: modelData.title,
               html: modelData.body,
               attachments: recipient.attachments || [],
             };
             // Envia o e-mail utilizando o transportador configurado
-            await transporter.sendMail(mailOptions).then(() => {});
+            await transporter.sendMail(mailOptions);
             // Retorna o resultado bem-sucedido para este destinatário
             return {
               email: recipient.email,
